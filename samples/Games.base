@@ -1,0 +1,6 @@
+filters:
+  and:
+    - file.inFolder("Games")
+views:
+  - type: someday-cards
+    name: Games

@@ -1,11 +1,9 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
-	"minAppVersion": "1.0.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"id": "someday-lib",
+	"name": "Someday Library",
+	"version": "0.1.0",
+	"minAppVersion": "1.10.0",
+	"description": "Track games and anime as notes and render them as a cover-image card gallery through a custom Bases view. Import from Steam and AniList (no API keys).",
+	"author": "lumpsoid",
 	"isDesktopOnly": false
 }
