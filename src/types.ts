@@ -10,7 +10,8 @@ export type Source = 'anilist' | 'steam';
  */
 export interface ItemData {
 	type: MediaType;
-	title: string;
+	title: string; // primary/display title (English for anime)
+	titleRomaji?: string; // Japanese romaji title, when distinct (anime)
 	source: Source;
 	sourceId: string;
 	url?: string;

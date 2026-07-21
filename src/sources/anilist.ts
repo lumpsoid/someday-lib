@@ -82,10 +82,14 @@ function toSearchResult(m: Media, prefer: TitleLanguage): SearchResult {
 	};
 }
 
-function toItemData(m: Media, prefer: TitleLanguage): ItemData {
+function toItemData(m: Media): ItemData {
+	// Store both variants; the display language is a render-time preference.
+	const romaji = m.title?.romaji;
+	const title = m.title?.english ?? romaji ?? `AniList #${m.id}`;
 	return {
 		type: 'anime',
-		title: titleOf(m, prefer),
+		title,
+		titleRomaji: romaji && romaji !== title ? romaji : undefined,
 		source: 'anilist',
 		sourceId: String(m.id),
 		url: m.siteUrl,
@@ -130,7 +134,7 @@ export class AniListAdapter implements SourceAdapter {
 			{ q: query },
 		);
 		return (data.Page?.media ?? []).map((m) =>
-			toSearchResult(m, settings.anilistTitleLanguage),
+			toSearchResult(m, settings.titleLanguage),
 		);
 	}
 
@@ -141,6 +145,6 @@ export class AniListAdapter implements SourceAdapter {
 		if (!data.Media) {
 			throw new HttpError(0, `AniList has no anime with id ${sourceId}.`);
 		}
-		return toItemData(data.Media, this.getSettings().anilistTitleLanguage);
+		return toItemData(data.Media);
 	}
 }

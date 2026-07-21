@@ -36,6 +36,7 @@ export function renderGallery(
 
 	renderCards(container, items, {
 		emptyText: options.emptyText,
+		titleLanguage: settings.titleLanguage,
 		onOpen: (item) => {
 			const file = fileFor.get(item);
 			if (!file) return;

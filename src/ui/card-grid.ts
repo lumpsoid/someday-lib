@@ -1,10 +1,14 @@
 import type { ItemData } from '../types';
+import type { TitleLanguage } from '../settings';
+import { displayTitle } from '../model/title';
 
 // Shared, framework-agnostic renderer: ItemData[] + a container -> a card grid.
 // It knows nothing about Bases or the vault; callers wire up onOpen.
 
 export interface CardGridOptions {
 	onOpen: (item: ItemData) => void;
+	/** Which stored title to show on each card. */
+	titleLanguage: TitleLanguage;
 	emptyText?: string;
 }
 
@@ -22,17 +26,19 @@ function renderCard(
 	grid: HTMLElement,
 	item: ItemData,
 	onOpen: (item: ItemData) => void,
+	titleLanguage: TitleLanguage,
 ): void {
+	const title = displayTitle(item, titleLanguage);
 	const card = grid.createDiv({ cls: 'someday-card' });
 	card.setAttribute('role', 'button');
 	card.tabIndex = 0;
-	card.setAttribute('aria-label', item.title);
+	card.setAttribute('aria-label', title);
 
 	const cover = card.createDiv({ cls: 'someday-card-cover' });
 	if (item.cover) {
 		const img = cover.createEl('img', {
 			cls: 'someday-card-img',
-			attr: { src: item.cover, alt: item.title, loading: 'lazy' },
+			attr: { src: item.cover, alt: title, loading: 'lazy' },
 		});
 		img.addEventListener('error', () => {
 			img.remove();
@@ -43,7 +49,7 @@ function renderCard(
 	}
 
 	const body = card.createDiv({ cls: 'someday-card-body' });
-	body.createDiv({ cls: 'someday-card-title', text: item.title });
+	body.createDiv({ cls: 'someday-card-title', text: title });
 
 	const badges = body.createDiv({ cls: 'someday-card-badges' });
 	if (item.status) {
@@ -92,6 +98,6 @@ export function renderCards(
 	}
 	const grid = container.createDiv({ cls: 'someday-grid' });
 	for (const item of items) {
-		renderCard(grid, item, opts.onOpen);
+		renderCard(grid, item, opts.onOpen, opts.titleLanguage);
 	}
 }

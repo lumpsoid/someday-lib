@@ -87,7 +87,8 @@ render it, the modal edits it). **No `type` field — the folder is the type.**
 
 ```yaml
 ---
-title: Frieren: Beyond Journey's End
+title: Frieren: Beyond Journey's End   # English/primary title
+title_romaji: Sousou no Frieren        # anime only, when it differs; display is a setting
 status: watching
 rating: 9                # 1–10
 source: anilist          # anilist | steam
@@ -117,7 +118,8 @@ export type Source = 'anilist' | 'steam';
 
 export interface ItemData {
   type: MediaType;                 // derived from folder, not stored
-  title: string;
+  title: string;                   // English/primary title
+  titleRomaji?: string;            // anime romaji title, when distinct
   source: Source;
   sourceId: string;
   url?: string;

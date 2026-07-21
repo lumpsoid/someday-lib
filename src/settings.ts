@@ -2,7 +2,7 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import type SomedayLibPlugin from './main';
 import type { MediaType } from './types';
 
-/** Which AniList title variant to use as the note title. */
+/** Which stored title variant to display on cards. */
 export type TitleLanguage = 'romaji' | 'english';
 
 export interface SomedaySettings {
@@ -16,8 +16,8 @@ export interface SomedaySettings {
 	steamLang: string;
 	/** Whether AniList search may return adult titles. */
 	anilistIncludeAdult: boolean;
-	/** Preferred AniList title variant for note titles (falls back to the other). */
-	anilistTitleLanguage: TitleLanguage;
+	/** Which stored title to display on cards (falls back to the other if missing). */
+	titleLanguage: TitleLanguage;
 	/** Ordered status vocabulary for anime; the first entry is the import default. */
 	animeStatuses: string[];
 	/** Ordered status vocabulary for games; the first entry is the import default. */
@@ -30,7 +30,7 @@ export const DEFAULT_SETTINGS: SomedaySettings = {
 	steamCc: 'us',
 	steamLang: 'english',
 	anilistIncludeAdult: false,
-	anilistTitleLanguage: 'english',
+	titleLanguage: 'english',
 	animeStatuses: ['planning', 'watching', 'completed', 'paused', 'dropped'],
 	gameStatuses: ['wishlist', 'backlog', 'playing', 'completed', 'dropped'],
 };
@@ -126,6 +126,25 @@ export class SomedaySettingTab extends PluginSettingTab {
 					}),
 			);
 
+		new Setting(containerEl).setName('Display').setHeading();
+
+		new Setting(containerEl)
+			.setName('Title language')
+			.setDesc(
+				'Which title to show on cards. Falls back to the other if missing (e.g. games have no romaji).',
+			)
+			.addDropdown((dd) =>
+				dd
+					.addOption('english', 'English')
+					.addOption('romaji', 'Japanese (romaji)')
+					.setValue(this.plugin.settings.titleLanguage)
+					.onChange(async (value) => {
+						this.plugin.settings.titleLanguage =
+							value as TitleLanguage;
+						await this.plugin.saveSettings();
+					}),
+			);
+
 		new Setting(containerEl).setName('AniList').setHeading();
 
 		new Setting(containerEl)
@@ -136,23 +155,6 @@ export class SomedaySettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.anilistIncludeAdult)
 					.onChange(async (value) => {
 						this.plugin.settings.anilistIncludeAdult = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName('Preferred title')
-			.setDesc(
-				'Which title to use when importing anime. Falls back to the other if unavailable.',
-			)
-			.addDropdown((dd) =>
-				dd
-					.addOption('english', 'English')
-					.addOption('romaji', 'Japanese (romaji)')
-					.setValue(this.plugin.settings.anilistTitleLanguage)
-					.onChange(async (value) => {
-						this.plugin.settings.anilistTitleLanguage =
-							value as TitleLanguage;
 						await this.plugin.saveSettings();
 					}),
 			);

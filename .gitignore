@@ -21,5 +21,8 @@ dist
 # obsidian
 data.json
 
+# python
+__pycache__
+
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store

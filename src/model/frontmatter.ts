@@ -17,6 +17,7 @@ interface Field {
 // intentionally absent — they are never frontmatter.
 const FIELDS: Field[] = [
 	{ item: 'title', fm: 'title', kind: 'string' },
+	{ item: 'titleRomaji', fm: 'title_romaji', kind: 'string' },
 	{ item: 'status', fm: 'status', kind: 'string' },
 	{ item: 'rating', fm: 'rating', kind: 'number' },
 	{ item: 'source', fm: 'source', kind: 'string' },

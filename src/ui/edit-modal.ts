@@ -1,6 +1,7 @@
 import { App, Modal, Notice, Setting, type TFile } from 'obsidian';
 import type { ItemData } from '../types';
 import { writeItem } from '../model/frontmatter';
+import { displayTitle } from '../model/title';
 import { clampRating, RATING_MAX, RATING_MIN } from '../model/rating';
 import { statusesFor, type SomedaySettings } from '../settings';
 
@@ -33,7 +34,9 @@ export class EditModal extends Modal {
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.addClass('someday-edit');
-		contentEl.createEl('h2', { text: this.item.title });
+		contentEl.createEl('h2', {
+			text: displayTitle(this.item, this.settings.titleLanguage),
+		});
 
 		new Setting(contentEl).setName('Status').addDropdown((dd) => {
 			dd.addOption('', '—');
