@@ -1,0 +1,6 @@
+filters:
+  and:
+    - file.inFolder("Anime")
+views:
+  - type: someday-cards
+    name: Anime

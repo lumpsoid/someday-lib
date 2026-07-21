@@ -1,14 +1,15 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "someday-lib",
+	"version": "0.1.0",
+	"description": "Track games and anime as notes rendered through a custom Bases card view, with keyless Steam and AniList import.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"install-vault": "bash scripts/install-vault.sh"
 	},
 	"keywords": [],
 	"license": "0-BSD",
