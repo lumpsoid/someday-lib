@@ -1,6 +1,6 @@
 {
 	"name": "someday-lib",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Track games and anime as notes rendered through a custom Bases card view, with keyless Steam and AniList import.",
 	"main": "main.js",
 	"type": "module",
