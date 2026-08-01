@@ -26,19 +26,24 @@ export class EditModal extends Modal {
 	) {
 		super(app);
 		this.status = item.status;
-		this.ratingText = item.rating !== undefined ? String(item.rating) : '';
+		// Normalised so a hand-written fractional rating still selects an option.
+		this.ratingText =
+			item.rating !== undefined ? String(clampRating(item.rating)) : '';
 		this.completed = item.completed ?? '';
 		this.episodesWatched = item.episodesWatched;
 	}
 
 	onOpen(): void {
 		const { contentEl } = this;
+		const title = displayTitle(this.item, this.settings.titleLanguage);
 		contentEl.addClass('someday-edit');
-		contentEl.createEl('h2', {
-			text: displayTitle(this.item, this.settings.titleLanguage),
-		});
+		contentEl.createEl('h2', { text: title });
 
-		new Setting(contentEl).setName('Status').addDropdown((dd) => {
+		const body = contentEl.createDiv({ cls: 'someday-edit-body' });
+		this.renderPoster(body, title);
+		const form = body.createDiv({ cls: 'someday-edit-form' });
+
+		new Setting(form).setName('Status').addDropdown((dd) => {
 			dd.addOption('', '—');
 			for (const status of statusesFor(this.settings, this.item.type)) {
 				dd.addOption(status, status);
@@ -48,19 +53,17 @@ export class EditModal extends Modal {
 			});
 		});
 
-		new Setting(contentEl)
-			.setName('Rating')
-			.setDesc(`${RATING_MIN}–${RATING_MAX}, or blank to clear.`)
-			.addText((text) => {
-				text.inputEl.type = 'number';
-				text.inputEl.min = String(RATING_MIN);
-				text.inputEl.max = String(RATING_MAX);
-				text.setValue(this.ratingText).onChange((v) => {
-					this.ratingText = v;
-				});
+		new Setting(form).setName('Rating').addDropdown((dd) => {
+			dd.addOption('', '—');
+			for (let n = RATING_MIN; n <= RATING_MAX; n++) {
+				dd.addOption(String(n), String(n));
+			}
+			dd.setValue(this.ratingText).onChange((v) => {
+				this.ratingText = v;
 			});
+		});
 
-		new Setting(contentEl).setName('Completed').addText((text) => {
+		new Setting(form).setName('Completed').addText((text) => {
 			text.inputEl.type = 'date';
 			text.setValue(this.completed).onChange((v) => {
 				this.completed = v;
@@ -68,19 +71,44 @@ export class EditModal extends Modal {
 		});
 
 		if (this.item.type === 'anime') {
-			this.renderEpisodes(contentEl);
+			this.renderEpisodes(form);
 		}
 
-		new Setting(contentEl).addButton((btn) =>
-			btn
-				.setButtonText('Save')
-				.setCta()
-				.onClick(() => void this.save()),
-		);
+		new Setting(form)
+			.addButton((btn) =>
+				btn.setButtonText('Open note').onClick(() => this.openNote()),
+			)
+			.addButton((btn) =>
+				btn
+					.setButtonText('Save')
+					.setCta()
+					.onClick(() => void this.save()),
+			);
 	}
 
 	onClose(): void {
 		this.contentEl.empty();
+	}
+
+	private renderPoster(body: HTMLElement, title: string): void {
+		const poster = body.createDiv({ cls: 'someday-edit-poster' });
+		if (!this.item.cover) {
+			poster.addClass('is-broken');
+			return;
+		}
+		const img = poster.createEl('img', {
+			attr: { src: this.item.cover, alt: title, loading: 'lazy' },
+		});
+		img.addEventListener('error', () => {
+			img.remove();
+			poster.addClass('is-broken');
+		});
+	}
+
+	/** Close the modal and reveal the underlying note in the active tab. */
+	private openNote(): void {
+		this.close();
+		void this.app.workspace.getLeaf(false).openFile(this.file);
 	}
 
 	private renderEpisodes(contentEl: HTMLElement): void {

@@ -150,6 +150,60 @@
 	justify-content: flex-end;
 }
 
+/* ---- Edit modal ---- */
+
+.someday-edit-body {
+	display: flex;
+	gap: var(--size-4-4);
+	align-items: flex-start;
+}
+
+.someday-edit-poster {
+	flex: 0 0 160px;
+	aspect-ratio: 2 / 3;
+	background: var(--background-modifier-hover);
+	border-radius: var(--radius-m);
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.someday-edit-poster img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.someday-edit-poster.is-broken::after {
+	content: '🎴';
+	font-size: 2rem;
+	opacity: 0.4;
+}
+
+.someday-edit-form {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.someday-edit-form .setting-item:first-child {
+	padding-top: 0;
+	border-top: none;
+}
+
+@media (max-width: 500px) {
+	.someday-edit-body {
+		flex-direction: column;
+	}
+
+	.someday-edit-poster {
+		flex-basis: auto;
+		width: 140px;
+		align-self: center;
+	}
+}
+
 /* ---- Bases view ---- */
 
 .someday-view-toolbar {
