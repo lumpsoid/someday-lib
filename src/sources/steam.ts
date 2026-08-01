@@ -2,7 +2,6 @@ import type { ItemData, SearchResult } from '../types';
 import type { SomedaySettings } from '../settings';
 import type { SourceAdapter } from './adapter';
 import { getJson, HttpError } from './http';
-import { percentScoreToRating } from '../model/rating';
 
 interface StoreSearchResponse {
 	items?: Array<{ id: number; name: string; tiny_image?: string }>;
@@ -15,7 +14,6 @@ interface AppDetailsData {
 	genres?: Array<{ description: string }>;
 	release_date?: { date?: string };
 	platforms?: { windows?: boolean; mac?: boolean; linux?: boolean };
-	metacritic?: { score?: number };
 }
 
 type AppDetailsResponse = Record<
@@ -76,7 +74,6 @@ export class SteamAdapter implements SourceAdapter {
 			sourceId,
 			url: `${STORE}/app/${sourceId}`,
 			cover: data.header_image,
-			rating: percentScoreToRating(data.metacritic?.score),
 			releaseDate: data.release_date?.date,
 			platforms: platformList(data.platforms),
 			description: data.short_description,

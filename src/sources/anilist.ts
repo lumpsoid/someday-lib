@@ -2,7 +2,6 @@ import type { ItemData, SearchResult } from '../types';
 import type { SomedaySettings, TitleLanguage } from '../settings';
 import type { SourceAdapter } from './adapter';
 import { postJson, HttpError } from './http';
-import { percentScoreToRating } from '../model/rating';
 
 const ENDPOINT = 'https://graphql.anilist.co';
 
@@ -13,7 +12,6 @@ const MEDIA_FIELDS = `
 	episodes
 	format
 	seasonYear
-	averageScore
 	description(asHtml: false)
 	siteUrl
 `;
@@ -40,7 +38,6 @@ interface Media {
 	episodes?: number;
 	format?: string;
 	seasonYear?: number;
-	averageScore?: number;
 	description?: string;
 	siteUrl?: string;
 }
@@ -94,7 +91,6 @@ function toItemData(m: Media): ItemData {
 		sourceId: String(m.id),
 		url: m.siteUrl,
 		cover: m.coverImage?.large,
-		rating: percentScoreToRating(m.averageScore),
 		episodesTotal: m.episodes,
 		format: m.format,
 		seasonYear: m.seasonYear,
