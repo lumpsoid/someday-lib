@@ -7,32 +7,40 @@ import type { ItemData, MediaType, Source } from '../types';
 
 type FieldKind = 'string' | 'number' | 'list';
 
+/**
+ * Who a field belongs to. `source` fields are facts the upstream describes and
+ * a re-import may refresh; `user` fields are the reader's own record (progress,
+ * verdict, dates) and no import ever touches them.
+ */
+type Owner = 'source' | 'user';
+
 interface Field {
 	item: keyof ItemData;
 	fm: string;
 	kind: FieldKind;
+	owner: Owner;
 }
 
 // `type` (derived from folder) and `description` (lives in the body) are
 // intentionally absent — they are never frontmatter.
 const FIELDS: Field[] = [
-	{ item: 'title', fm: 'title', kind: 'string' },
-	{ item: 'titleRomaji', fm: 'title_romaji', kind: 'string' },
-	{ item: 'status', fm: 'status', kind: 'string' },
-	{ item: 'rating', fm: 'rating', kind: 'number' },
-	{ item: 'source', fm: 'source', kind: 'string' },
-	{ item: 'sourceId', fm: 'source_id', kind: 'string' },
-	{ item: 'url', fm: 'url', kind: 'string' },
-	{ item: 'cover', fm: 'cover', kind: 'string' },
-	{ item: 'added', fm: 'added', kind: 'string' },
-	{ item: 'started', fm: 'started', kind: 'string' },
-	{ item: 'completed', fm: 'completed', kind: 'string' },
-	{ item: 'episodesTotal', fm: 'episodes_total', kind: 'number' },
-	{ item: 'episodesWatched', fm: 'episodes_watched', kind: 'number' },
-	{ item: 'format', fm: 'format', kind: 'string' },
-	{ item: 'seasonYear', fm: 'season_year', kind: 'number' },
-	{ item: 'releaseDate', fm: 'release_date', kind: 'string' },
-	{ item: 'platforms', fm: 'platforms', kind: 'list' },
+	{ item: 'title', fm: 'title', kind: 'string', owner: 'source' },
+	{ item: 'titleRomaji', fm: 'title_romaji', kind: 'string', owner: 'source' },
+	{ item: 'status', fm: 'status', kind: 'string', owner: 'user' },
+	{ item: 'rating', fm: 'rating', kind: 'number', owner: 'user' },
+	{ item: 'source', fm: 'source', kind: 'string', owner: 'source' },
+	{ item: 'sourceId', fm: 'source_id', kind: 'string', owner: 'source' },
+	{ item: 'url', fm: 'url', kind: 'string', owner: 'source' },
+	{ item: 'cover', fm: 'cover', kind: 'string', owner: 'source' },
+	{ item: 'added', fm: 'added', kind: 'string', owner: 'user' },
+	{ item: 'started', fm: 'started', kind: 'string', owner: 'user' },
+	{ item: 'completed', fm: 'completed', kind: 'string', owner: 'user' },
+	{ item: 'episodesTotal', fm: 'episodes_total', kind: 'number', owner: 'source' },
+	{ item: 'episodesWatched', fm: 'episodes_watched', kind: 'number', owner: 'user' },
+	{ item: 'format', fm: 'format', kind: 'string', owner: 'source' },
+	{ item: 'seasonYear', fm: 'season_year', kind: 'number', owner: 'source' },
+	{ item: 'releaseDate', fm: 'release_date', kind: 'string', owner: 'source' },
+	{ item: 'platforms', fm: 'platforms', kind: 'list', owner: 'source' },
 ];
 
 /** Stringify only primitive scalars; objects/dates yield undefined (skipped). */
@@ -84,6 +92,23 @@ export function readItem(app: App, file: TFile, type: MediaType): ItemData {
 		}
 	}
 	return item;
+}
+
+/**
+ * The part of a freshly fetched `item` a re-import may write onto a note that
+ * already exists: the source-owned facts, minus any the source did not return
+ * this time (a missing cover means "not fetched", never "drop the stored one").
+ * User-owned fields are absent from the patch, so merging never disturbs them.
+ */
+export function sourceOwnedPatch(item: ItemData): Partial<ItemData> {
+	const patch: Partial<ItemData> = {};
+	for (const field of FIELDS) {
+		if (field.owner !== 'source') continue;
+		const value = item[field.item];
+		if (value === undefined || value === null || value === '') continue;
+		(patch as Record<string, unknown>)[field.item] = value;
+	}
+	return patch;
 }
 
 /**

@@ -59,6 +59,7 @@ src/
     frontmatter.ts        # read/write frontmatter <-> ItemData (processFrontMatter)
     note-writer.ts        # create note from ItemData (folder by type, filename)
     media-type.ts         # derive 'anime'|'game' from a file's folder + settings
+    duplicate.ts          # is this item already in the vault? (source+id, then filename)
   sources/
     adapter.ts            # SourceAdapter interface + registry
     steam.ts              # SteamAdapter (storesearch + appdetails)
@@ -68,6 +69,7 @@ src/
     card-grid.ts          # SHARED renderer: ItemData[] -> DOM card grid
     edit-modal.ts         # tap-to-edit modal
     import-modal.ts       # query + upstream select + results + multi-select
+    duplicate-modal.ts    # "note already exists": merge / create / skip
   view/
     bases-view.ts         # SomedayCardsView extends BasesView -> card-grid
     codeblock.ts          # optional: ```someday-gallery code block -> card-grid
@@ -253,6 +255,13 @@ Each phase is independently testable and leaves the plugin in a working state.
   AniList) + **By title / By ID** toggle, "Search"/"Fetch" → results list with
   thumbnails, multi-select, "Add selected" → `getDetails` + `createNote` (into
   that source's folder) per pick, progress `Notice`, optional "open note".
+- **Duplicates:** before writing, `model/duplicate.ts` looks for a note with the
+  same `source` + `source_id` (falling back to the target filename). On a hit,
+  `ui/duplicate-modal.ts` asks: **merge** (rewrite the source-owned frontmatter,
+  leave status/rating/dates/progress and the body alone), **create** a second
+  note, or **skip**. Answering can apply to the rest of the batch; dismissing
+  the dialog means skip. Field ownership lives in the `FIELDS` table in
+  `model/frontmatter.ts`.
 - Command **Add game or anime** + ribbon icon.
 - **Done when:** searching one upstream and picking results creates correct
   notes in the correct folder.
