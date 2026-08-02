@@ -96,6 +96,18 @@
 
 /* ---- Import modal ---- */
 
+/*
+ * The dialog is capped and laid out as a column so the results list is the only
+ * part that ever runs out of room. Without this, a "Show more" page grows the
+ * list past what the modal can hold and the whole dialog starts scrolling,
+ * taking the query field and the Add button off screen.
+ */
+.someday-import {
+	display: flex;
+	flex-direction: column;
+	max-height: 70vh;
+}
+
 .someday-segmented {
 	display: flex;
 	gap: 2px;
@@ -116,8 +128,11 @@
 }
 
 .someday-import-results {
-	/* Taller thumbs mean taller rows; keep roughly the same hits on screen. */
-	max-height: 55vh;
+	/* Shrink into whatever the dialog has left, but never grow past the rows —
+	   a short result list should not stretch to the full height. min-height
+	   overrides the auto minimum that would otherwise block the shrink. */
+	flex: 0 1 auto;
+	min-height: 0;
 	overflow-y: auto;
 	margin: var(--size-4-2) 0;
 	border: 1px solid var(--background-modifier-border);
