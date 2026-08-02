@@ -16,7 +16,10 @@ mobile.
   folder, configured in settings. There is no `type` field.
 - **Browse** — a custom Bases view, **Someday cards**, renders a folder of these
   notes as a responsive gallery of covers with status/rating badges and anime
-  episode progress. One base = one folder = one media type.
+  episode progress. One base = one folder = one media type. The view's **Card
+  layout** option shapes the cover box: **Auto** (the default) gives a games
+  base the wide box Steam's header art is drawn at and an anime base the tall
+  box AniList covers use, and **Portrait** / **Landscape** pin it either way.
 - **Edit** — click a card to open a modal for the common edits: **status**,
   **rating** (1–10), **completed date**, and **episodes watched** (anime).
 - **Import** — the **Add game or anime** command (also a ribbon icon and the

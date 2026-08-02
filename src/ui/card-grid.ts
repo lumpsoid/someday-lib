@@ -5,10 +5,20 @@ import { displayTitle } from '../model/title';
 // Shared, framework-agnostic renderer: ItemData[] + a container -> a card grid.
 // It knows nothing about Bases or the vault; callers wire up onOpen.
 
+/**
+ * The shape of the cover box. The sources ship opposite ratios — AniList covers
+ * are 230x320 portrait, Steam header art is 460x215 landscape — and a cover in
+ * the wrong box is cropped to a heavy center zoom. Applies to a whole grid, not
+ * a card: uniform boxes are what makes the rows line up.
+ */
+export type CardLayout = 'portrait' | 'landscape';
+
 export interface CardGridOptions {
 	onOpen: (item: ItemData) => void;
 	/** Which stored title to show on each card. */
 	titleLanguage: TitleLanguage;
+	/** Cover shape for the grid. Defaults to `portrait`. */
+	layout?: CardLayout;
 	emptyText?: string;
 }
 
@@ -96,7 +106,12 @@ export function renderCards(
 		});
 		return;
 	}
-	const grid = container.createDiv({ cls: 'someday-grid' });
+	const grid = container.createDiv({
+		cls:
+			opts.layout === 'landscape'
+				? 'someday-grid is-landscape'
+				: 'someday-grid',
+	});
 	for (const item of items) {
 		renderCard(grid, item, opts.onOpen, opts.titleLanguage);
 	}

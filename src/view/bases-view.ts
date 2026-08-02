@@ -1,11 +1,37 @@
-import { BasesView, type QueryController } from 'obsidian';
+import {
+	BasesView,
+	type BasesDropdownOption,
+	type QueryController,
+} from 'obsidian';
 import type SomedayLibPlugin from '../main';
 import type { Source } from '../types';
 import { typeForFile } from '../model/media-type';
-import { renderGallery } from '../ui/gallery';
+import { parseCardLayout, renderGallery } from '../ui/gallery';
 import { ImportModal } from '../ui/import-modal';
 
 export const SOMEDAY_VIEW_TYPE = 'someday-cards';
+
+/** Config key holding this view's card layout, stored in the `.base` file. */
+const CARD_LAYOUT_KEY = 'cardLayout';
+
+/**
+ * The layout picker Bases shows in this view's config menu. `auto` fits the box
+ * to the source (landscape for a games base, portrait for anime); the explicit
+ * values are there for the bases that guess wrong.
+ */
+export function cardLayoutOption(): BasesDropdownOption {
+	return {
+		type: 'dropdown',
+		key: CARD_LAYOUT_KEY,
+		displayName: 'Card layout',
+		default: 'auto',
+		options: {
+			auto: 'Auto',
+			portrait: 'Portrait',
+			landscape: 'Landscape',
+		},
+	};
+}
 
 /**
  * The custom Bases view. Bases hands us a query result; we map each entry's file
@@ -35,11 +61,16 @@ export class SomedayCardsView extends BasesView {
 		});
 		add.addEventListener('click', () => this.openImport());
 		this.cardsEl = this.root.createDiv({ cls: 'someday-view-cards' });
-		this.render();
+		// Build the shell only. Bases assigns `config` and `data` *after* it
+		// loads the view, so there is nothing to draw yet — and reading
+		// `this.config` this early throws, which aborts the very query setup
+		// that would have fed us. onDataUpdated does every paint.
 	}
 
 	onunload(): void {
 		this.root?.remove();
+		this.root = undefined;
+		this.cardsEl = undefined;
 	}
 
 	onDataUpdated(): void {
@@ -61,6 +92,7 @@ export class SomedayCardsView extends BasesView {
 			{
 				emptyText:
 					'No notes match this base yet. Use Add to import one.',
+				layout: parseCardLayout(this.config.get(CARD_LAYOUT_KEY)),
 			},
 		);
 	}
