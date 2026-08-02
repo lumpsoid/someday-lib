@@ -42,3 +42,9 @@ export interface SearchResult {
 	thumb?: string;
 	subtitle?: string; // e.g. "TV · 28 eps" or "Game · 2023"
 }
+
+/** One page of title-search hits, plus whether asking for the next can add any. */
+export interface SearchPage {
+	results: SearchResult[];
+	hasMore: boolean;
+}

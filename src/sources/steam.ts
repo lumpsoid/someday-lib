@@ -1,4 +1,4 @@
-import type { ItemData, SearchResult } from '../types';
+import type { ItemData, SearchPage, SearchResult } from '../types';
 import type { SomedaySettings } from '../settings';
 import type { SourceAdapter } from './adapter';
 import { getJson, HttpError } from './http';
@@ -26,11 +26,21 @@ type AppDetailsResponse = Record<
 	{ success: boolean; data?: AppDetailsData }
 >;
 
+/** The store search page returns its hits as rendered rows, not as data. */
+interface StorePageResponse {
+	results_html?: string;
+	total_count?: number;
+}
+
 const STORE = 'https://store.steampowered.com';
 
 /** `store.steampowered.com/app/238960/Path_of_Exile/` → `238960`. */
 const APP_URL_RE = /(?:^|\/)app\/(\d+)/;
 const DIGITS_RE = /^\d+$/;
+/** Rows are keyed `App_440`, `Sub_124923` or `Bundle_…`; only apps resolve. */
+const ITEM_KEY_RE = /^App_(\d+)$/;
+/** What the store search page hands back per request. */
+const STORE_PAGE_SIZE = 25;
 
 /** Steam release dates are localised free text ("17 Mar, 2020"); take the year. */
 function releaseYear(date?: string): number | undefined {
@@ -45,6 +55,32 @@ function platformList(p: AppDetailsData['platforms']): string[] | undefined {
 	if (p.mac) list.push('macOS');
 	if (p.linux) list.push('Linux');
 	return list.length > 0 ? list : undefined;
+}
+
+/** Read the hits out of the store search page's rendered result rows. */
+function parseStoreRows(html: string): SearchResult[] {
+	const doc = new DOMParser().parseFromString(html, 'text/html');
+	const results: SearchResult[] = [];
+	for (const row of Array.from(doc.querySelectorAll('a.search_result_row'))) {
+		const appId = ITEM_KEY_RE.exec(
+			row.getAttribute('data-ds-itemkey') ?? '',
+		)?.[1];
+		const title = row.querySelector('.title')?.textContent?.trim();
+		if (appId === undefined || !title) continue;
+		results.push({
+			source: 'steam',
+			sourceId: appId,
+			title,
+			year: releaseYear(
+				row.querySelector('.search_released')?.textContent ?? undefined,
+			),
+			thumb:
+				row.querySelector('.search_capsule img')?.getAttribute('src') ??
+				undefined,
+			subtitle: 'Game',
+		});
+	}
+	return results;
 }
 
 export class SteamAdapter implements SourceAdapter {
@@ -62,12 +98,22 @@ export class SteamAdapter implements SourceAdapter {
 		return `cc=${encodeURIComponent(s.steamCc)}&l=${encodeURIComponent(s.steamLang)}`;
 	}
 
-	async search(query: string): Promise<SearchResult[]> {
+	/**
+	 * storesearch gives the tightest matches but caps every query at ten hits
+	 * and ignores paging arguments, so it can only ever be page one. Later pages
+	 * restart the query against the store's own search page, which does
+	 * paginate; its first rows repeat what page one showed, and the caller drops
+	 * those.
+	 */
+	async search(query: string, page: number): Promise<SearchPage> {
+		if (page > 1) {
+			return this.searchStorePage(query, (page - 2) * STORE_PAGE_SIZE);
+		}
 		const url = `${STORE}/api/storesearch/?term=${encodeURIComponent(query)}&${this.region()}`;
 		const res = await getJson<StoreSearchResponse>(url);
 		// storesearch mixes apps with packages ("sub") and bundles, which
 		// /api/appdetails cannot resolve — drop everything that is not an app.
-		return (res.items ?? [])
+		const results = (res.items ?? [])
 			.filter((item) => item.type === 'app')
 			.map((item) => ({
 				source: 'steam' as const,
@@ -79,6 +125,27 @@ export class SteamAdapter implements SourceAdapter {
 				thumb: item.tiny_image,
 				subtitle: 'Game',
 			}));
+		// A query that matched nothing here matches nothing on the store page
+		// either; anything else is worth another page.
+		return { results, hasMore: results.length > 0 };
+	}
+
+	/** One page of the store's search, starting at the `start`-th hit. */
+	private async searchStorePage(
+		query: string,
+		start: number,
+	): Promise<SearchPage> {
+		// `infinite=1` is the store's own endless-scroll endpoint: JSON carrying
+		// the rendered rows, with no data-only equivalent. category1=998 keeps it
+		// to games, so DLC and soundtracks stay out of the list.
+		const url =
+			`${STORE}/search/results/?json=1&infinite=1&category1=998` +
+			`&term=${encodeURIComponent(query)}&start=${start}&count=${STORE_PAGE_SIZE}&${this.region()}`;
+		const res = await getJson<StorePageResponse>(url);
+		return {
+			results: parseStoreRows(res.results_html ?? ''),
+			hasMore: start + STORE_PAGE_SIZE < (res.total_count ?? 0),
+		};
 	}
 
 	parseId(input: string): string | undefined {

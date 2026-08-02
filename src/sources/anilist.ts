@@ -1,4 +1,4 @@
-import type { ItemData, SearchResult } from '../types';
+import type { ItemData, SearchPage, SearchResult } from '../types';
 import type { SomedaySettings, TitleLanguage } from '../settings';
 import type { SourceAdapter } from './adapter';
 import { postJson, HttpError } from './http';
@@ -19,8 +19,11 @@ const MEDIA_FIELDS = `
 // AniList treats `isAdult: null` as "match media whose isAdult IS null" (none),
 // so to include adult results we must OMIT the argument entirely rather than
 // pass null. The filter is only present when excluding adult titles.
-const searchQuery = (includeAdult: boolean): string => `query ($q: String) {
-	Page(perPage: 12) {
+const PER_PAGE = 12;
+
+const searchQuery = (includeAdult: boolean): string => `query ($q: String, $page: Int) {
+	Page(page: $page, perPage: ${PER_PAGE}) {
+		pageInfo { hasNextPage }
 		media(search: $q, type: ANIME, sort: SEARCH_MATCH${
 			includeAdult ? '' : ', isAdult: false'
 		}) {${MEDIA_FIELDS}}
@@ -130,15 +133,17 @@ export class AniListAdapter implements SourceAdapter {
 		return res.data;
 	}
 
-	async search(query: string): Promise<SearchResult[]> {
+	async search(query: string, page: number): Promise<SearchPage> {
 		const settings = this.getSettings();
-		const data = await this.query<{ Page?: { media?: Media[] } }>(
-			searchQuery(settings.anilistIncludeAdult),
-			{ q: query },
-		);
-		return (data.Page?.media ?? []).map((m) =>
-			toSearchResult(m, settings.titleLanguage),
-		);
+		const data = await this.query<{
+			Page?: { pageInfo?: { hasNextPage?: boolean }; media?: Media[] };
+		}>(searchQuery(settings.anilistIncludeAdult), { q: query, page });
+		return {
+			results: (data.Page?.media ?? []).map((m) =>
+				toSearchResult(m, settings.titleLanguage),
+			),
+			hasMore: data.Page?.pageInfo?.hasNextPage ?? false,
+		};
 	}
 
 	parseId(input: string): string | undefined {

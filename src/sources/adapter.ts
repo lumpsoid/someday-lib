@@ -1,4 +1,4 @@
-import type { ItemData, MediaType, SearchResult, Source } from '../types';
+import type { ItemData, MediaType, SearchPage, SearchResult, Source } from '../types';
 import type { SomedaySettings } from '../settings';
 import { SteamAdapter } from './steam';
 import { AniListAdapter } from './anilist';
@@ -21,7 +21,12 @@ export interface SourceAdapter {
 	/** Accepted forms, shown under the by-id field. */
 	readonly idHint: string;
 	readonly idPlaceholder: string;
-	search(query: string): Promise<SearchResult[]>;
+	/**
+	 * One page of hits for a title query. Pages are 1-based and each is meant to
+	 * be appended to the ones before it, so an adapter may repeat a hit it
+	 * already returned — the caller drops what it already lists.
+	 */
+	search(query: string, page: number): Promise<SearchPage>;
 	/**
 	 * Extract the upstream id from what the user typed — a bare id or a pasted
 	 * page URL. Returns undefined when the input is not an id at all.
