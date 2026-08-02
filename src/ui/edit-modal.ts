@@ -91,7 +91,15 @@ export class EditModal extends Modal {
 	}
 
 	private renderPoster(body: HTMLElement, title: string): void {
-		const poster = body.createDiv({ cls: 'someday-edit-poster' });
+		// Games carry Steam's 460x215 header art, so the poster box takes the
+		// item's own shape rather than a fixed 2:3 — otherwise the modal crops
+		// a landscape cover down to a tall sliver.
+		const poster = body.createDiv({
+			cls:
+				this.item.type === 'game'
+					? 'someday-edit-poster is-wide'
+					: 'someday-edit-poster',
+		});
 		if (!this.item.cover) {
 			poster.addClass('is-broken');
 			return;

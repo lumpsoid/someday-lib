@@ -37,6 +37,13 @@
 
 .someday-card-cover {
 	aspect-ratio: 2 / 3;
+	/*
+	 * The card is a column flex container, so this box's automatic minimum is
+	 * its content's height — a cover taller than the ratio would stretch the
+	 * box to fit instead of being cropped into it, and the grid would go
+	 * ragged. Zeroing the minimum lets the ratio win.
+	 */
+	min-height: 0;
 	background: var(--background-modifier-hover);
 	display: flex;
 	align-items: center;
@@ -258,10 +265,20 @@
 	justify-content: center;
 }
 
+.someday-edit-poster.is-wide {
+	flex-basis: 260px;
+	aspect-ratio: 460 / 215;
+}
+
+/*
+ * `contain`, not `cover`: this is the detail view, and a note migrated from
+ * another tool can carry a cover of any shape. Fitting it whole leaves a band
+ * of backdrop; cropping it would hide part of the only art we have.
+ */
 .someday-edit-poster img {
 	width: 100%;
 	height: 100%;
-	object-fit: cover;
+	object-fit: contain;
 	display: block;
 }
 
@@ -290,6 +307,10 @@
 		flex-basis: auto;
 		width: 140px;
 		align-self: center;
+	}
+
+	.someday-edit-poster.is-wide {
+		width: 100%;
 	}
 }
 
