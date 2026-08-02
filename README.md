@@ -48,7 +48,7 @@ This plugin is offline by default. It makes network requests **only** when you
 explicitly search or import, to these public endpoints, using no API keys and no
 authentication:
 
-- **Steam** — `store.steampowered.com/api/storesearch` (search) and
+- **Steam** — `store.steampowered.com/search/results` (search) and
   `store.steampowered.com/api/appdetails` (details) for games.
 - **AniList** — `graphql.anilist.co` (search and details) for anime.
 

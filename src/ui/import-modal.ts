@@ -15,9 +15,9 @@ export interface ImportModalOptions {
 }
 
 /**
- * How the query field is interpreted. Upstream title search misses delisted and
- * region-restricted entries (Steam's storesearch never returns "Thief" 2014 or
- * Lost Ark), so the user can switch to resolving an id directly.
+ * How the query field is interpreted. Upstream title search still misses
+ * entries the storefront will not list — delisted, region-restricted or
+ * unreleased — so the user can switch to resolving an id directly.
  */
 type LookupMode = 'title' | 'id';
 
@@ -250,22 +250,15 @@ export class ImportModal extends Modal {
 		this.loadingMore = true;
 		this.renderMore();
 		try {
-			// A page can be entirely hits already listed — Steam's later pages come
-			// from a different endpoint than its first and re-report it. Keep going
-			// rather than leave the click looking like it did nothing.
-			for (let tries = 0; tries < MORE_PAGE_TRIES && this.hasMore; tries += 1) {
-				const page = await this.adapters[source].search(
-					this.activeQuery,
-					this.nextPage,
-				);
-				this.nextPage += 1;
-				this.hasMore = page.hasMore;
-				const fresh = this.addResults(page.results);
-				if (fresh.length > 0) {
-					for (const result of fresh) this.renderRow(result);
-					break;
-				}
-			}
+			const page = await this.adapters[source].search(
+				this.activeQuery,
+				this.nextPage,
+			);
+			this.nextPage += 1;
+			this.hasMore = page.hasMore;
+			// addResults still guards against a repeat: every page walks a fresh
+			// offset now, but a shifting result set upstream can still resend a hit.
+			for (const result of this.addResults(page.results)) this.renderRow(result);
 		} catch (err) {
 			new Notice(`Loading more failed: ${errorMessage(err)}`);
 		} finally {
@@ -478,8 +471,6 @@ interface ImportOutcome {
 	failed: number;
 }
 
-/** How many pages one "Show more" click may skip past before giving up. */
-const MORE_PAGE_TRIES = 3;
 /** Keep the Notice from covering the screen on a big import. */
 const NOTICE_LINK_LIMIT = 8;
 /** Long enough to actually click a link. */
