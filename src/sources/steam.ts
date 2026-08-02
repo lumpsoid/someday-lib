@@ -73,6 +73,9 @@ export class SteamAdapter implements SourceAdapter {
 				source: 'steam' as const,
 				sourceId: String(item.id),
 				title: item.name,
+				// The 231x87 capsule is all storesearch offers. Bigger art lives on
+				// a per-asset hashed path that cannot be derived from this URL, and
+				// only appdetails' heavyweight `basic` payload reports it.
 				thumb: item.tiny_image,
 				subtitle: 'Game',
 			}));
