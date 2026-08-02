@@ -62,7 +62,7 @@ src/
     duplicate.ts          # is this item already in the vault? (source+id, then filename)
   sources/
     adapter.ts            # SourceAdapter interface + registry
-    steam.ts              # SteamAdapter (storesearch + appdetails)
+    steam.ts              # SteamAdapter (store search page + appdetails)
     anilist.ts            # AniListAdapter (GraphQL)
     http.ts               # requestUrl wrapper: JSON, errors, rate-limit backoff
   ui/
@@ -174,17 +174,25 @@ export interface SourceAdapter {
 }
 ```
 
-Title search is best-effort: upstream search endpoints miss delisted,
-region-restricted and non-storefront entries (Steam's `storesearch` returns
-nothing for *Thief* 2014, Lost Ark or Throne and Liberty). The import modal
+Title search is best-effort: upstream search endpoints miss entries the
+storefront itself will not list — delisted, region-restricted and
+non-storefront ones. The import modal
 therefore offers a **By title / By ID** toggle; in ID mode the input takes a bare
 id or a pasted page URL and resolves the entry directly through the detail
 endpoint.
 
 ### 5.1 Steam (games)
 
-- **Search:** `GET https://store.steampowered.com/api/storesearch/?term=<q>&cc=<cc>&l=<lang>`
-  → `{ items: [{ id, name, tiny_image, price }] }`. Keyless.
+- **Search:** `GET https://store.steampowered.com/search/results/?json=1&infinite=1&category1=998,21&term=<q>&start=<n>&count=25&cc=<cc>&l=<lang>`
+  → `{ results_html, total_count }`. Keyless. This is the store's endless-scroll
+  endpoint and the only Steam search that paginates, so it serves every page;
+  `api/storesearch` returns cleaner JSON but caps each query at ten hits and
+  ignores paging arguments. `results_html` is rendered markup, parsed for
+  `a.search_result_row` — app id from `data-ds-itemkey` (`App_<id>`; `Sub_`/
+  `Bundle_` rows are skipped, as `appdetails` cannot resolve them), plus
+  `.title`, `.search_released`, `.search_capsule img`. `category1=998,21` is
+  games + DLC: expansions stay in, standalone soundtracks stay out. Being
+  scraped markup, it is the one upstream shape that can break without notice.
 - **Details:** `GET https://store.steampowered.com/api/appdetails?appids=<id>&cc=<cc>&l=<lang>`
   → `header_image`, `short_description`, `genres`, `release_date`, `platforms`.
   Keyless, rate-limited (~200 req / 5 min). On `429` back off ~10s; on `403`
