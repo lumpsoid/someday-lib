@@ -105,10 +105,10 @@ export class EditModal extends Modal {
 		});
 	}
 
-	/** Close the modal and reveal the underlying note in the active tab. */
+	/** Close the modal and open the underlying note in a new tab. */
 	private openNote(): void {
 		this.close();
-		void this.app.workspace.getLeaf(false).openFile(this.file);
+		void this.app.workspace.getLeaf(true).openFile(this.file);
 	}
 
 	private renderEpisodes(contentEl: HTMLElement): void {
