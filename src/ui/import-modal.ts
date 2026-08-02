@@ -1,14 +1,17 @@
 import { App, Modal, Notice, Setting, type TFile } from 'obsidian';
-import type { SearchResult, Source } from '../types';
+import type { ItemData, SearchResult, Source } from '../types';
 import type { SourceAdapter } from '../sources/adapter';
-import { createNote } from '../model/note-writer';
+import { createNote, mergeNote } from '../model/note-writer';
+import { findExistingNote } from '../model/duplicate';
+import { displayTitle } from '../model/title';
+import { DuplicateModal, type DuplicateChoice } from './duplicate-modal';
 import { defaultStatus, type SomedaySettings } from '../settings';
 
 export interface ImportModalOptions {
 	/** Upstream to pre-select (e.g. an Anime base opens straight to AniList). */
 	initialSource?: Source;
-	/** Called once per created note, e.g. to refresh a view. */
-	onCreated?: (file: TFile) => void;
+	/** Called once per note the import created or merged, e.g. to refresh a view. */
+	onImported?: (file: TFile) => void;
 }
 
 /**
@@ -29,6 +32,8 @@ export class ImportModal extends Modal {
 	private addButton!: HTMLButtonElement;
 	private searching = false;
 	private emptyText = 'No results. Enter a query and search.';
+	/** Set when a duplicate dialog is answered with "apply to the rest". */
+	private standingChoice?: DuplicateChoice;
 
 	constructor(
 		app: App,
@@ -246,8 +251,14 @@ export class ImportModal extends Modal {
 		if (picks.length === 0) return;
 
 		this.addButton.disabled = true;
-		const created: TFile[] = [];
-		let failures = 0;
+		this.standingChoice = undefined;
+		const touched: TFile[] = [];
+		const outcome: ImportOutcome = {
+			created: 0,
+			merged: 0,
+			skipped: 0,
+			failed: 0,
+		};
 		const progress = new Notice(`Adding 0/${picks.length}…`, 0);
 		try {
 			for (const [index, pick] of picks.entries()) {
@@ -255,15 +266,39 @@ export class ImportModal extends Modal {
 				try {
 					const item = await adapter.getDetails(pick.sourceId);
 					item.status = defaultStatus(this.settings, adapter.type);
-					const file = await createNote(
+
+					const existing = findExistingNote(
 						this.app,
 						item,
 						this.settings,
 					);
-					created.push(file);
-					this.options.onCreated?.(file);
+					const choice = existing
+						? await this.resolveDuplicate(
+								item,
+								existing,
+								picks.length - index - 1,
+							)
+						: 'create';
+
+					if (existing && choice === 'merge') {
+						await mergeNote(this.app, existing, item);
+						outcome.merged += 1;
+						touched.push(existing);
+						this.options.onImported?.(existing);
+					} else if (choice === 'skip') {
+						outcome.skipped += 1;
+					} else {
+						const file = await createNote(
+							this.app,
+							item,
+							this.settings,
+						);
+						outcome.created += 1;
+						touched.push(file);
+						this.options.onImported?.(file);
+					}
 				} catch (err) {
-					failures += 1;
+					outcome.failed += 1;
 					new Notice(`Failed: ${pick.title} — ${errorMessage(err)}`);
 				}
 			}
@@ -272,18 +307,39 @@ export class ImportModal extends Modal {
 		}
 
 		this.close();
-		this.reportCreated(created, failures);
+		this.reportImport(touched, outcome);
+	}
+
+	/**
+	 * What to do about `item` already being in the vault — the user's answer,
+	 * unless an earlier answer in this run said to apply itself to the rest.
+	 */
+	private async resolveDuplicate(
+		item: ItemData,
+		existing: TFile,
+		remaining: number,
+	): Promise<DuplicateChoice> {
+		if (this.standingChoice) return this.standingChoice;
+		const decision = await DuplicateModal.ask(this.app, {
+			title: displayTitle(item, this.settings.titleLanguage),
+			existing,
+			remaining,
+		});
+		if (decision.applyToRest) this.standingChoice = decision.choice;
+		return decision.choice;
 	}
 
 	/**
 	 * Summarise the import in a Notice. Nothing is opened automatically —
-	 * each created note gets a link that opens it in a new tab on click.
+	 * each touched note gets a link that opens it in a new tab on click.
 	 */
-	private reportCreated(created: TFile[], failures: number): void {
-		const summary =
-			`Added ${created.length} note${created.length === 1 ? '' : 's'}` +
-			(failures > 0 ? `, ${failures} failed.` : '.');
-		if (created.length === 0) {
+	private reportImport(touched: TFile[], outcome: ImportOutcome): void {
+		const parts = [`Added ${outcome.created}`];
+		if (outcome.merged > 0) parts.push(`merged ${outcome.merged}`);
+		if (outcome.skipped > 0) parts.push(`skipped ${outcome.skipped}`);
+		if (outcome.failed > 0) parts.push(`${outcome.failed} failed`);
+		const summary = `${parts.join(', ')}.`;
+		if (touched.length === 0) {
 			new Notice(summary);
 			return;
 		}
@@ -291,7 +347,7 @@ export class ImportModal extends Modal {
 		const frag = createFragment();
 		frag.createDiv({ text: summary });
 		const list = frag.createDiv({ cls: 'someday-notice-links' });
-		const shown = created.slice(0, NOTICE_LINK_LIMIT);
+		const shown = touched.slice(0, NOTICE_LINK_LIMIT);
 		for (const file of shown) {
 			const link = list.createEl('a', {
 				text: file.basename,
@@ -303,7 +359,7 @@ export class ImportModal extends Modal {
 				void this.app.workspace.getLeaf(true).openFile(file);
 			});
 		}
-		const rest = created.length - shown.length;
+		const rest = touched.length - shown.length;
 		if (rest > 0) {
 			list.createDiv({
 				cls: 'someday-notice-more',
@@ -312,6 +368,14 @@ export class ImportModal extends Modal {
 		}
 		new Notice(frag, NOTICE_DURATION_MS);
 	}
+}
+
+/** Tally of what one import run did, for the closing Notice. */
+interface ImportOutcome {
+	created: number;
+	merged: number;
+	skipped: number;
+	failed: number;
 }
 
 /** Keep the Notice from covering the screen on a big import. */
