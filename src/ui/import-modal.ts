@@ -26,11 +26,24 @@ export class ImportModal extends Modal {
 	private mode: LookupMode = 'title';
 	private query = '';
 	private results: SearchResult[] = [];
+	/** Ids already listed — later pages may repeat hits from earlier ones. */
+	private readonly listed = new Set<string>();
 	private readonly selected = new Set<string>();
 	private queryEl!: HTMLElement;
 	private resultsEl!: HTMLElement;
+	private rowsEl!: HTMLElement;
+	private moreEl!: HTMLElement;
 	private addButton!: HTMLButtonElement;
 	private searching = false;
+	/**
+	 * The search the listed results came from. The source dropdown and the query
+	 * field may have moved on since, but "Show more" has to keep paging this one.
+	 */
+	private activeSource?: Source;
+	private activeQuery = '';
+	private nextPage = 1;
+	private hasMore = false;
+	private loadingMore = false;
 	private emptyText = 'No results. Enter a query and search.';
 	/** Set when a duplicate dialog is answered with "apply to the rest". */
 	private standingChoice?: DuplicateChoice;
@@ -66,6 +79,10 @@ export class ImportModal extends Modal {
 		this.renderQuery();
 
 		this.resultsEl = contentEl.createDiv({ cls: 'someday-import-results' });
+		this.rowsEl = this.resultsEl.createDiv();
+		// Kept outside the rows so loading a page can append to the list without
+		// rebuilding it, which would throw away the scroll position.
+		this.moreEl = this.resultsEl.createDiv({ cls: 'someday-import-more' });
 
 		const footer = contentEl.createDiv({ cls: 'someday-import-footer' });
 		this.addButton = footer.createEl('button', {
@@ -150,10 +167,7 @@ export class ImportModal extends Modal {
 		const adapter = this.adapters[this.source];
 
 		if (this.mode === 'title') {
-			await this.runLookup(
-				() => adapter.search(raw),
-				'No results. Try the ID lookup — search misses delisted and region-restricted titles.',
-			);
+			await this.runSearch(raw);
 			return;
 		}
 
@@ -168,20 +182,21 @@ export class ImportModal extends Modal {
 		);
 	}
 
-	private async runLookup(
-		fetch: () => Promise<SearchResult[]>,
-		emptyText: string,
-	): Promise<void> {
-		this.searching = true;
-		this.selected.clear();
-		this.results = [];
-		this.emptyText = emptyText;
-		this.resultsEl.empty();
-		this.resultsEl.createDiv({ cls: 'someday-empty', text: 'Searching…' });
+	/** A fresh title search: replaces the list and arms "Show more". */
+	private async runSearch(query: string): Promise<void> {
+		const source = this.source;
+		this.activeSource = source;
+		this.activeQuery = query;
+		this.nextPage = 1;
+		this.beginLookup(
+			'No results. Try the ID lookup — search misses delisted and region-restricted titles.',
+		);
 		try {
-			this.results = await fetch();
+			const page = await this.adapters[source].search(query, this.nextPage);
+			this.nextPage += 1;
+			this.hasMore = page.hasMore;
+			this.addResults(page.results);
 		} catch (err) {
-			this.results = [];
 			new Notice(`Lookup failed: ${errorMessage(err)}`);
 		} finally {
 			this.searching = false;
@@ -189,52 +204,137 @@ export class ImportModal extends Modal {
 		}
 	}
 
+	private async runLookup(
+		fetch: () => Promise<SearchResult[]>,
+		emptyText: string,
+	): Promise<void> {
+		// A by-id lookup resolves one entry, so it is never paged.
+		this.activeSource = undefined;
+		this.beginLookup(emptyText);
+		try {
+			this.addResults(await fetch());
+		} catch (err) {
+			new Notice(`Lookup failed: ${errorMessage(err)}`);
+		} finally {
+			this.searching = false;
+			this.renderResults();
+		}
+	}
+
+	/** Clear the list and show the pending state while a lookup runs. */
+	private beginLookup(emptyText: string): void {
+		this.searching = true;
+		this.selected.clear();
+		this.results = [];
+		this.listed.clear();
+		this.hasMore = false;
+		this.emptyText = emptyText;
+		this.rowsEl.empty();
+		this.rowsEl.createDiv({ cls: 'someday-empty', text: 'Searching…' });
+		this.moreEl.empty();
+	}
+
+	/** Append the hits that are not listed yet; returns just those. */
+	private addResults(results: SearchResult[]): SearchResult[] {
+		const fresh = results.filter((r) => !this.listed.has(r.sourceId));
+		for (const result of fresh) this.listed.add(result.sourceId);
+		this.results.push(...fresh);
+		return fresh;
+	}
+
+	/** Load the next page of the current search onto the end of the list. */
+	private async loadMore(): Promise<void> {
+		if (this.loadingMore || !this.hasMore) return;
+		const source = this.activeSource;
+		if (source === undefined) return;
+		this.loadingMore = true;
+		this.renderMore();
+		try {
+			// A page can be entirely hits already listed — Steam's later pages come
+			// from a different endpoint than its first and re-report it. Keep going
+			// rather than leave the click looking like it did nothing.
+			for (let tries = 0; tries < MORE_PAGE_TRIES && this.hasMore; tries += 1) {
+				const page = await this.adapters[source].search(
+					this.activeQuery,
+					this.nextPage,
+				);
+				this.nextPage += 1;
+				this.hasMore = page.hasMore;
+				const fresh = this.addResults(page.results);
+				if (fresh.length > 0) {
+					for (const result of fresh) this.renderRow(result);
+					break;
+				}
+			}
+		} catch (err) {
+			new Notice(`Loading more failed: ${errorMessage(err)}`);
+		} finally {
+			this.loadingMore = false;
+			this.renderMore();
+			this.updateAddButton();
+		}
+	}
+
 	private renderResults(): void {
-		this.resultsEl.empty();
+		this.rowsEl.empty();
 		if (this.results.length === 0) {
-			this.resultsEl.createDiv({
+			this.rowsEl.createDiv({
 				cls: 'someday-empty',
 				text: this.emptyText,
 			});
 		}
-		for (const result of this.results) {
-			const row = this.resultsEl.createDiv({ cls: 'someday-result' });
-			const checkbox = row.createEl('input', {
-				type: 'checkbox',
-				cls: 'someday-result-check',
-			});
-			checkbox.checked = this.selected.has(result.sourceId);
-			checkbox.addEventListener('change', () => {
-				if (checkbox.checked) this.selected.add(result.sourceId);
-				else this.selected.delete(result.sourceId);
-				this.updateAddButton();
-			});
+		for (const result of this.results) this.renderRow(result);
+		this.renderMore();
+		this.updateAddButton();
+	}
 
-			if (result.thumb) {
-				// Sources ship different shapes (Steam landscape headers, AniList
-				// portrait covers); the class picks the box that fits uncropped.
-				row.createEl('img', {
-					cls: `someday-result-thumb someday-thumb-${result.source}`,
-					attr: { src: result.thumb, alt: result.title, loading: 'lazy' },
-				});
-			}
+	private renderRow(result: SearchResult): void {
+		const row = this.rowsEl.createDiv({ cls: 'someday-result' });
+		const checkbox = row.createEl('input', {
+			type: 'checkbox',
+			cls: 'someday-result-check',
+		});
+		checkbox.checked = this.selected.has(result.sourceId);
+		checkbox.addEventListener('change', () => {
+			if (checkbox.checked) this.selected.add(result.sourceId);
+			else this.selected.delete(result.sourceId);
+			this.updateAddButton();
+		});
 
-			const meta = row.createDiv({ cls: 'someday-result-meta' });
-			meta.createDiv({ cls: 'someday-result-title', text: result.title });
-			const subtitle = [result.subtitle, result.year]
-				.filter((v) => v !== undefined && v !== '')
-				.join(' · ');
-			if (subtitle) {
-				meta.createDiv({ cls: 'someday-result-sub', text: subtitle });
-			}
-
-			row.addEventListener('click', (evt) => {
-				if (evt.target === checkbox) return;
-				checkbox.checked = !checkbox.checked;
-				checkbox.dispatchEvent(new Event('change'));
+		if (result.thumb) {
+			// Sources ship different shapes (Steam landscape headers, AniList
+			// portrait covers); the class picks the box that fits uncropped.
+			row.createEl('img', {
+				cls: `someday-result-thumb someday-thumb-${result.source}`,
+				attr: { src: result.thumb, alt: result.title, loading: 'lazy' },
 			});
 		}
-		this.updateAddButton();
+
+		const meta = row.createDiv({ cls: 'someday-result-meta' });
+		meta.createDiv({ cls: 'someday-result-title', text: result.title });
+		const subtitle = [result.subtitle, result.year]
+			.filter((v) => v !== undefined && v !== '')
+			.join(' · ');
+		if (subtitle) {
+			meta.createDiv({ cls: 'someday-result-sub', text: subtitle });
+		}
+
+		row.addEventListener('click', (evt) => {
+			if (evt.target === checkbox) return;
+			checkbox.checked = !checkbox.checked;
+			checkbox.dispatchEvent(new Event('change'));
+		});
+	}
+
+	private renderMore(): void {
+		this.moreEl.empty();
+		if (!this.hasMore || this.results.length === 0) return;
+		const btn = this.moreEl.createEl('button', {
+			text: this.loadingMore ? 'Loading…' : 'Show more',
+			cls: 'someday-more',
+		});
+		btn.disabled = this.loadingMore;
+		btn.addEventListener('click', () => void this.loadMore());
 	}
 
 	private updateAddButton(): void {
@@ -378,6 +478,8 @@ interface ImportOutcome {
 	failed: number;
 }
 
+/** How many pages one "Show more" click may skip past before giving up. */
+const MORE_PAGE_TRIES = 3;
 /** Keep the Notice from covering the screen on a big import. */
 const NOTICE_LINK_LIMIT = 8;
 /** Long enough to actually click a link. */
