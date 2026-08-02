@@ -31,6 +31,10 @@ const DETAILS_QUERY = `query ($id: Int) {
 	Media(id: $id, type: ANIME) {${MEDIA_FIELDS}}
 }`;
 
+/** `anilist.co/anime/21519/Kimi-no-Na-wa/` → `21519`. */
+const MEDIA_URL_RE = /(?:^|\/)(?:anime|manga)\/(\d+)/;
+const DIGITS_RE = /^\d+$/;
+
 interface Media {
 	id: number;
 	title?: { romaji?: string; english?: string };
@@ -102,6 +106,9 @@ export class AniListAdapter implements SourceAdapter {
 	readonly id = 'anilist' as const;
 	readonly label = 'AniList';
 	readonly type = 'anime' as const;
+	readonly idLabel = 'AniList ID';
+	readonly idHint = 'The number in a media URL: anilist.co/anime/21519/';
+	readonly idPlaceholder = '21519 or AniList URL';
 
 	constructor(private readonly getSettings: () => SomedaySettings) {}
 
@@ -134,13 +141,29 @@ export class AniListAdapter implements SourceAdapter {
 		);
 	}
 
-	async getDetails(sourceId: string): Promise<ItemData> {
+	parseId(input: string): string | undefined {
+		const raw = input.trim();
+		return (
+			MEDIA_URL_RE.exec(raw)?.[1] ?? (DIGITS_RE.test(raw) ? raw : undefined)
+		);
+	}
+
+	async lookupById(id: string): Promise<SearchResult[]> {
+		const media = await this.media(id);
+		return [toSearchResult(media, this.getSettings().titleLanguage)];
+	}
+
+	private async media(id: string): Promise<Media> {
 		const data = await this.query<{ Media?: Media }>(DETAILS_QUERY, {
-			id: Number(sourceId),
+			id: Number(id),
 		});
 		if (!data.Media) {
-			throw new HttpError(0, `AniList has no anime with id ${sourceId}.`);
+			throw new HttpError(0, `AniList has no anime with id ${id}.`);
 		}
-		return toItemData(data.Media);
+		return data.Media;
+	}
+
+	async getDetails(sourceId: string): Promise<ItemData> {
+		return toItemData(await this.media(sourceId));
 	}
 }

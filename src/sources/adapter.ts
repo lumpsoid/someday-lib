@@ -7,12 +7,28 @@ import { AniListAdapter } from './anilist';
  * One upstream (Steam, AniList). A narrow port: search returns lightweight hits,
  * getDetails resolves one hit into a full ItemData. The media type is fixed per
  * source (Steam → game, AniList → anime).
+ *
+ * Title search is best-effort — upstream search endpoints miss delisted,
+ * region-restricted and oddly-titled entries — so every adapter also resolves a
+ * hit straight from its own id (`parseId` + `lookupById`).
  */
 export interface SourceAdapter {
 	readonly id: Source;
 	readonly label: string;
 	readonly type: MediaType;
+	/** Field label for the by-id lookup, e.g. "Steam app ID". */
+	readonly idLabel: string;
+	/** Accepted forms, shown under the by-id field. */
+	readonly idHint: string;
+	readonly idPlaceholder: string;
 	search(query: string): Promise<SearchResult[]>;
+	/**
+	 * Extract the upstream id from what the user typed — a bare id or a pasted
+	 * page URL. Returns undefined when the input is not an id at all.
+	 */
+	parseId(input: string): string | undefined;
+	/** Resolve one id into a hit, bypassing search. Empty when nothing matches. */
+	lookupById(id: string): Promise<SearchResult[]>;
 	getDetails(sourceId: string): Promise<ItemData>;
 }
 

@@ -11,13 +11,24 @@ export interface ImportModalOptions {
 	onCreated?: (file: TFile) => void;
 }
 
+/**
+ * How the query field is interpreted. Upstream title search misses delisted and
+ * region-restricted entries (Steam's storesearch never returns "Thief" 2014 or
+ * Lost Ark), so the user can switch to resolving an id directly.
+ */
+type LookupMode = 'title' | 'id';
+
 export class ImportModal extends Modal {
 	private source: Source;
+	private mode: LookupMode = 'title';
+	private query = '';
 	private results: SearchResult[] = [];
 	private readonly selected = new Set<string>();
+	private queryEl!: HTMLElement;
 	private resultsEl!: HTMLElement;
 	private addButton!: HTMLButtonElement;
 	private searching = false;
+	private emptyText = 'No results. Enter a query and search.';
 
 	constructor(
 		app: App,
@@ -40,29 +51,14 @@ export class ImportModal extends Modal {
 			}
 			dd.setValue(this.source).onChange((value) => {
 				this.source = value as Source;
+				// The id field is labelled per source ("Steam app ID"/"AniList ID").
+				this.renderQuery();
 			});
 		});
 
-		let queryValue = '';
-		new Setting(contentEl)
-			.setName('Search')
-			.addText((text) => {
-				text.setPlaceholder('Title…').onChange((v) => {
-					queryValue = v;
-				});
-				text.inputEl.addEventListener('keydown', (evt) => {
-					if (evt.key === 'Enter') {
-						evt.preventDefault();
-						void this.doSearch(queryValue);
-					}
-				});
-			})
-			.addButton((btn) =>
-				btn
-					.setButtonText('Search')
-					.setCta()
-					.onClick(() => void this.doSearch(queryValue)),
-			);
+		this.renderModeToggle(contentEl);
+		this.queryEl = contentEl.createDiv();
+		this.renderQuery();
 
 		this.resultsEl = contentEl.createDiv({ cls: 'someday-import-results' });
 
@@ -81,19 +77,107 @@ export class ImportModal extends Modal {
 		this.contentEl.empty();
 	}
 
-	private async doSearch(query: string): Promise<void> {
-		const q = query.trim();
-		if (!q || this.searching) return;
+	/** Segmented control switching the query field between title and id. */
+	private renderModeToggle(parent: HTMLElement): void {
+		const setting = new Setting(parent).setName('Look up');
+		const group = setting.controlEl.createDiv({ cls: 'someday-segmented' });
+		const modes: Array<[LookupMode, string]> = [
+			['title', 'By title'],
+			['id', 'By ID'],
+		];
+		const buttons: Array<{ mode: LookupMode; btn: HTMLButtonElement }> = [];
+		const sync = (): void => {
+			for (const { mode, btn } of buttons) {
+				const active = mode === this.mode;
+				btn.toggleClass('is-active', active);
+				btn.setAttr('aria-pressed', String(active));
+			}
+		};
+		for (const [mode, label] of modes) {
+			const btn = group.createEl('button', { text: label, type: 'button' });
+			btn.addEventListener('click', () => {
+				if (this.mode === mode) return;
+				this.mode = mode;
+				sync();
+				this.renderQuery(true);
+			});
+			buttons.push({ mode, btn });
+		}
+		sync();
+	}
+
+	/** Rebuilt whenever the mode or the source changes — both retitle the field. */
+	private renderQuery(focus = false): void {
+		this.queryEl.empty();
+		const adapter = this.adapters[this.source];
+		const byId = this.mode === 'id';
+		const setting = new Setting(this.queryEl).setName(
+			byId ? adapter.idLabel : 'Search',
+		);
+		if (byId) setting.setDesc(adapter.idHint);
+		setting
+			.addText((text) => {
+				text
+					.setPlaceholder(byId ? adapter.idPlaceholder : 'Title…')
+					.setValue(this.query)
+					.onChange((v) => {
+						this.query = v;
+					});
+				text.inputEl.addEventListener('keydown', (evt) => {
+					if (evt.key === 'Enter') {
+						evt.preventDefault();
+						void this.doSubmit();
+					}
+				});
+				if (focus) text.inputEl.focus();
+			})
+			.addButton((btn) =>
+				btn
+					.setButtonText(byId ? 'Fetch' : 'Search')
+					.setCta()
+					.onClick(() => void this.doSubmit()),
+			);
+	}
+
+	private async doSubmit(): Promise<void> {
+		const raw = this.query.trim();
+		if (!raw || this.searching) return;
+		const adapter = this.adapters[this.source];
+
+		if (this.mode === 'title') {
+			await this.runLookup(
+				() => adapter.search(raw),
+				'No results. Try the ID lookup — search misses delisted and region-restricted titles.',
+			);
+			return;
+		}
+
+		const id = adapter.parseId(raw);
+		if (id === undefined) {
+			new Notice(`Not a valid ${adapter.idLabel}. ${adapter.idHint}`);
+			return;
+		}
+		await this.runLookup(
+			() => adapter.lookupById(id),
+			`Nothing found for ${adapter.idLabel} ${id}.`,
+		);
+	}
+
+	private async runLookup(
+		fetch: () => Promise<SearchResult[]>,
+		emptyText: string,
+	): Promise<void> {
 		this.searching = true;
 		this.selected.clear();
 		this.results = [];
+		this.emptyText = emptyText;
 		this.resultsEl.empty();
 		this.resultsEl.createDiv({ cls: 'someday-empty', text: 'Searching…' });
 		try {
-			this.results = await this.adapters[this.source].search(q);
+			this.results = await fetch();
 		} catch (err) {
 			this.results = [];
-			new Notice(`Search failed: ${errorMessage(err)}`);
+			new Notice(`Lookup failed: ${errorMessage(err)}`);
 		} finally {
 			this.searching = false;
 			this.renderResults();
@@ -105,7 +189,7 @@ export class ImportModal extends Modal {
 		if (this.results.length === 0) {
 			this.resultsEl.createDiv({
 				cls: 'someday-empty',
-				text: 'No results. Enter a query and search.',
+				text: this.emptyText,
 			});
 		}
 		for (const result of this.results) {

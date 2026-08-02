@@ -28,6 +28,16 @@ type AppDetailsResponse = Record<
 
 const STORE = 'https://store.steampowered.com';
 
+/** `store.steampowered.com/app/238960/Path_of_Exile/` → `238960`. */
+const APP_URL_RE = /(?:^|\/)app\/(\d+)/;
+const DIGITS_RE = /^\d+$/;
+
+/** Steam release dates are localised free text ("17 Mar, 2020"); take the year. */
+function releaseYear(date?: string): number | undefined {
+	const year = date?.match(/\b(\d{4})\b/)?.[1];
+	return year !== undefined ? Number(year) : undefined;
+}
+
 function platformList(p: AppDetailsData['platforms']): string[] | undefined {
 	if (!p) return undefined;
 	const list: string[] = [];
@@ -41,6 +51,9 @@ export class SteamAdapter implements SourceAdapter {
 	readonly id = 'steam' as const;
 	readonly label = 'Steam';
 	readonly type = 'game' as const;
+	readonly idLabel = 'Steam app ID';
+	readonly idHint = 'The number in a store URL: store.steampowered.com/app/239160/';
+	readonly idPlaceholder = '239160 or store URL';
 
 	constructor(private readonly getSettings: () => SomedaySettings) {}
 
@@ -65,17 +78,37 @@ export class SteamAdapter implements SourceAdapter {
 			}));
 	}
 
-	async getDetails(sourceId: string): Promise<ItemData> {
-		const url = `${STORE}/api/appdetails?appids=${encodeURIComponent(sourceId)}&${this.region()}`;
+	parseId(input: string): string | undefined {
+		const raw = input.trim();
+		return APP_URL_RE.exec(raw)?.[1] ?? (DIGITS_RE.test(raw) ? raw : undefined);
+	}
+
+	async lookupById(id: string): Promise<SearchResult[]> {
+		const data = await this.appDetails(id);
+		return [
+			{
+				source: 'steam' as const,
+				sourceId: id,
+				title: data.name,
+				year: releaseYear(data.release_date?.date),
+				thumb: data.header_image,
+				subtitle: 'Game',
+			},
+		];
+	}
+
+	private async appDetails(appId: string): Promise<AppDetailsData> {
+		const url = `${STORE}/api/appdetails?appids=${encodeURIComponent(appId)}&${this.region()}`;
 		const res = await getJson<AppDetailsResponse>(url);
-		const entry = res[sourceId];
+		const entry = res[appId];
 		if (!entry || !entry.success || !entry.data) {
-			throw new HttpError(
-				0,
-				`Steam returned no details for app ${sourceId}.`,
-			);
+			throw new HttpError(0, `Steam returned no details for app ${appId}.`);
 		}
-		const data = entry.data;
+		return entry.data;
+	}
+
+	async getDetails(sourceId: string): Promise<ItemData> {
+		const data = await this.appDetails(sourceId);
 		return {
 			type: 'game',
 			title: data.name,

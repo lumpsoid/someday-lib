@@ -162,10 +162,22 @@ export interface SourceAdapter {
   id: Source;
   label: string;
   type: MediaType;                         // steam->game, anilist->anime
+  idLabel: string;                         // "Steam app ID" / "AniList ID"
+  idHint: string;
+  idPlaceholder: string;
   search(query: string): Promise<SearchResult[]>;
+  parseId(input: string): string | undefined;   // bare id or pasted page URL
+  lookupById(id: string): Promise<SearchResult[]>;
   getDetails(sourceId: string): Promise<ItemData>;
 }
 ```
+
+Title search is best-effort: upstream search endpoints miss delisted,
+region-restricted and non-storefront entries (Steam's `storesearch` returns
+nothing for *Thief* 2014, Lost Ark or Throne and Liberty). The import modal
+therefore offers a **By title / By ID** toggle; in ID mode the input takes a bare
+id or a pasted page URL and resolves the entry directly through the detail
+endpoint.
 
 ### 5.1 Steam (games)
 
@@ -238,9 +250,9 @@ Each phase is independently testable and leaves the plugin in a working state.
 
 ### Phase 3 — Import UI
 - `ui/import-modal.ts`: query input + **single upstream selector** (Steam or
-  AniList), "Search" → results list with thumbnails, multi-select, "Add
-  selected" → `getDetails` + `createNote` (into that source's folder) per pick,
-  progress `Notice`, optional "open note".
+  AniList) + **By title / By ID** toggle, "Search"/"Fetch" → results list with
+  thumbnails, multi-select, "Add selected" → `getDetails` + `createNote` (into
+  that source's folder) per pick, progress `Notice`, optional "open note".
 - Command **Add game or anime** + ribbon icon.
 - **Done when:** searching one upstream and picking results creates correct
   notes in the correct folder.

@@ -96,6 +96,25 @@
 
 /* ---- Import modal ---- */
 
+.someday-segmented {
+	display: flex;
+	gap: 2px;
+	padding: 2px;
+	border-radius: var(--radius-m);
+	background-color: var(--background-modifier-form-field);
+}
+
+.someday-segmented button {
+	box-shadow: none;
+	background-color: transparent;
+	color: var(--text-muted);
+}
+
+.someday-segmented button.is-active {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
 .someday-import-results {
 	max-height: 45vh;
 	overflow-y: auto;
