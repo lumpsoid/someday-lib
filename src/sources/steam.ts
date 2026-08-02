@@ -4,7 +4,12 @@ import type { SourceAdapter } from './adapter';
 import { getJson, HttpError } from './http';
 
 interface StoreSearchResponse {
-	items?: Array<{ id: number; name: string; tiny_image?: string }>;
+	items?: Array<{
+		id: number;
+		name: string;
+		tiny_image?: string;
+		type?: string;
+	}>;
 }
 
 interface AppDetailsData {
@@ -47,13 +52,17 @@ export class SteamAdapter implements SourceAdapter {
 	async search(query: string): Promise<SearchResult[]> {
 		const url = `${STORE}/api/storesearch/?term=${encodeURIComponent(query)}&${this.region()}`;
 		const res = await getJson<StoreSearchResponse>(url);
-		return (res.items ?? []).map((item) => ({
-			source: 'steam',
-			sourceId: String(item.id),
-			title: item.name,
-			thumb: item.tiny_image,
-			subtitle: 'Game',
-		}));
+		// storesearch mixes apps with packages ("sub") and bundles, which
+		// /api/appdetails cannot resolve — drop everything that is not an app.
+		return (res.items ?? [])
+			.filter((item) => item.type === 'app')
+			.map((item) => ({
+				source: 'steam' as const,
+				sourceId: String(item.id),
+				title: item.name,
+				thumb: item.tiny_image,
+				subtitle: 'Game',
+			}));
 	}
 
 	async getDetails(sourceId: string): Promise<ItemData> {
