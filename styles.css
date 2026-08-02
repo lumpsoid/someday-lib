@@ -211,3 +211,25 @@
 	justify-content: flex-end;
 	padding: var(--size-4-2);
 }
+
+/* ---- Import notice ---- */
+
+.someday-notice-links {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-2-1);
+	margin-top: var(--size-4-2);
+}
+
+.someday-notice-link {
+	cursor: pointer;
+	text-decoration: underline;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.someday-notice-more {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}

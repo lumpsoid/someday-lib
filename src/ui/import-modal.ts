@@ -185,17 +185,53 @@ export class ImportModal extends Modal {
 			progress.hide();
 		}
 
-		new Notice(
-			`Added ${created.length} note${created.length === 1 ? '' : 's'}` +
-				(failures > 0 ? `, ${failures} failed.` : '.'),
-		);
 		this.close();
-		const only = created.length === 1 ? created[0] : undefined;
-		if (only) {
-			void this.app.workspace.getLeaf(true).openFile(only);
+		this.reportCreated(created, failures);
+	}
+
+	/**
+	 * Summarise the import in a Notice. Nothing is opened automatically —
+	 * each created note gets a link that opens it in a new tab on click.
+	 */
+	private reportCreated(created: TFile[], failures: number): void {
+		const summary =
+			`Added ${created.length} note${created.length === 1 ? '' : 's'}` +
+			(failures > 0 ? `, ${failures} failed.` : '.');
+		if (created.length === 0) {
+			new Notice(summary);
+			return;
 		}
+
+		const frag = createFragment();
+		frag.createDiv({ text: summary });
+		const list = frag.createDiv({ cls: 'someday-notice-links' });
+		const shown = created.slice(0, NOTICE_LINK_LIMIT);
+		for (const file of shown) {
+			const link = list.createEl('a', {
+				text: file.basename,
+				cls: 'someday-notice-link',
+				href: '#',
+			});
+			link.addEventListener('click', (evt) => {
+				evt.preventDefault();
+				void this.app.workspace.getLeaf(true).openFile(file);
+			});
+		}
+		const rest = created.length - shown.length;
+		if (rest > 0) {
+			list.createDiv({
+				cls: 'someday-notice-more',
+				text: `…and ${rest} more.`,
+			});
+		}
+		new Notice(frag, NOTICE_DURATION_MS);
 	}
 }
+
+/** Keep the Notice from covering the screen on a big import. */
+const NOTICE_LINK_LIMIT = 8;
+/** Long enough to actually click a link. */
+const NOTICE_DURATION_MS = 15000;
 
 function errorMessage(err: unknown): string {
 	return err instanceof Error ? err.message : String(err);
