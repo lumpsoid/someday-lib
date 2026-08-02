@@ -9,6 +9,14 @@
 	padding: var(--size-4-2);
 }
 
+/*
+ * Landscape covers need more width to stay legible — at the portrait track
+ * width a 2.14:1 box is only ~65px tall — so the whole grid widens with them.
+ */
+.someday-grid.is-landscape {
+	grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+
 .someday-card {
 	display: flex;
 	flex-direction: column;
@@ -33,6 +41,12 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+/* Steam header art is 460x215; matching it keeps the whole capsule visible
+   instead of the center crop a portrait box would take. */
+.someday-grid.is-landscape .someday-card-cover {
+	aspect-ratio: 460 / 215;
 }
 
 .someday-card-cover.is-broken::after {

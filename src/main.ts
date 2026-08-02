@@ -6,7 +6,11 @@ import {
 } from './settings';
 import type { Source } from './types';
 import { createAdapters, type SourceAdapter } from './sources/adapter';
-import { SomedayCardsView, SOMEDAY_VIEW_TYPE } from './view/bases-view';
+import {
+	cardLayoutOption,
+	SomedayCardsView,
+	SOMEDAY_VIEW_TYPE,
+} from './view/bases-view';
 import { registerGalleryCodeblock } from './view/codeblock';
 import { ImportModal } from './ui/import-modal';
 
@@ -25,6 +29,7 @@ export default class SomedayLibPlugin extends Plugin {
 			icon: 'layout-grid',
 			factory: (controller, containerEl) =>
 				new SomedayCardsView(controller, containerEl, this),
+			options: () => [cardLayoutOption()],
 		});
 
 		registerGalleryCodeblock(this);
