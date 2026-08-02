@@ -206,8 +206,10 @@ export class ImportModal extends Modal {
 			});
 
 			if (result.thumb) {
+				// Sources ship different shapes (Steam landscape headers, AniList
+				// portrait covers); the class picks the box that fits uncropped.
 				row.createEl('img', {
-					cls: 'someday-result-thumb',
+					cls: `someday-result-thumb someday-thumb-${result.source}`,
 					attr: { src: result.thumb, alt: result.title, loading: 'lazy' },
 				});
 			}

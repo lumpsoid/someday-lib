@@ -116,7 +116,8 @@
 }
 
 .someday-import-results {
-	max-height: 45vh;
+	/* Taller thumbs mean taller rows; keep roughly the same hits on screen. */
+	max-height: 55vh;
 	overflow-y: auto;
 	margin: var(--size-4-2) 0;
 	border: 1px solid var(--background-modifier-border);
@@ -140,12 +141,29 @@
 	background: var(--background-modifier-hover);
 }
 
+/*
+ * `cover` crops hard here, because the sources ship opposite shapes: Steam
+ * capsules are 231x87 landscape, AniList covers 230x320 portrait. So each
+ * source gets a box at its own ratio and the art is fitted whole inside it.
+ * A list only ever holds one source, so the fixed width keeps titles aligned.
+ */
 .someday-result-thumb {
-	width: 46px;
-	height: 46px;
-	object-fit: cover;
+	object-fit: contain;
 	border-radius: var(--radius-s);
+	background: var(--background-secondary);
 	flex-shrink: 0;
+}
+
+/* Between the 2.66:1 search capsule and the 2.14:1 header a by-id hit
+   returns, so either fits with only a thin margin. */
+.someday-thumb-steam {
+	width: 164px;
+	height: 68px;
+}
+
+.someday-thumb-anilist {
+	width: 56px;
+	height: 78px;
 }
 
 .someday-result-meta {
