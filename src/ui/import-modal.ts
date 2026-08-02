@@ -136,7 +136,6 @@ export class ImportModal extends Modal {
 		const setting = new Setting(this.queryEl).setName(
 			byId ? adapter.idLabel : 'Search',
 		);
-		if (byId) setting.setDesc(adapter.idHint);
 		setting
 			.addText((text) => {
 				text
